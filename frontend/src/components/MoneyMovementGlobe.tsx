@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as am5 from '@amcharts/amcharts5'
 import * as am5map from '@amcharts/amcharts5/map'
 import am5geodata_worldLow from '@amcharts/amcharts5-geodata/worldLow'
-import am5themes_Animated from '@amcharts/amcharts5/themes/Animated'
 import am5themes_Responsive from '@amcharts/amcharts5/themes/Responsive'
 
 type TraceNode = { account_id: string; pseudonymous_key: string; is_operating_institution: boolean; min_hop: number }
@@ -10,12 +9,17 @@ type TraceEdge = { transaction_id: string; source_account: string; destination_a
 type Trace = { trace_id: string; victim_account: string; seed_transaction_id: string; seed_amount: string; nodes: TraceNode[]; edges: TraceEdge[]; is_synthetic: boolean }
 type Flow = TraceEdge & { source_account: string; destination_account: string }
 
-// Schematic display anchors only: the ledger trace contains no account geolocation.
-const illustrativeAnchors: [number, number][] = [
-  [78.4867, 17.385], [72.8777, 19.076], [77.209, 28.6139], [77.5946, 12.9716],
-  [80.2707, 13.0827], [88.3639, 22.5726], [55.2708, 25.2048], [103.8198, 1.3521],
-  [72.8777, 19.076], [77.209, 28.6139], [103.8198, 1.3521], [55.2708, 25.2048],
+// Presentation anchors. Ledger records do not supply account geolocation.
+const domesticAnchors: [number, number][] = [
+  [78.4867, 17.385], [72.8777, 19.076], [77.2090, 28.6139], [77.5946, 12.9716],
+  [80.2707, 13.0827], [88.3639, 22.5726], [73.8567, 18.5204], [75.7873, 26.9124],
+  [72.5714, 23.0225], [76.6394, 12.2958], [79.0882, 21.1458], [85.1376, 25.5941],
+  [74.8723, 31.6340], [73.1812, 22.3072], [76.9558, 11.0168], [80.9462, 26.8467],
+  [77.4126, 23.2599], [81.6296, 21.2514], [75.8577, 22.7196], [83.9812, 21.4669],
+  [91.7362, 26.1445], [86.2029, 22.8046], [79.4192, 13.6288], [70.8022, 22.3039],
 ]
+const externalAnchors: [number, number][] = [[55.2708, 25.2048], [103.8198, 1.3521]]
+const amount = (value: string) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value))
 
 export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, onInspect }: {
   trace: Trace
@@ -25,30 +29,41 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
 }) {
   const chartHost = useRef<HTMLDivElement>(null)
   const chartRef = useRef<am5map.MapChart | null>(null)
+  const movementRef = useRef<am5map.MapPointSeries | null>(null)
+  const inspectRef = useRef(onInspect)
+  const movementAnimations = useRef<{ stop: () => void }[]>([])
   const [country, setCountry] = useState('India region')
+  const [selectedTransfer, setSelectedTransfer] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
-  const flows: Flow[] = [
+  inspectRef.current = onInspect
+  const flows: Flow[] = useMemo(() => [
     ...(trace.nodes.length ? [{ transaction_id: trace.seed_transaction_id, source_account: trace.victim_account, destination_account: trace.nodes.find(node => node.min_hop === 1)?.account_id ?? trace.nodes[0].account_id, timestamp_utc: '', raw_amount: trace.seed_amount, attributed_amount: trace.seed_amount, hop: 0, channel: 'Reported payment', is_terminal: false }] : []),
     ...trace.edges,
-  ]
+  ], [trace])
 
   useEffect(() => {
     if (!chartHost.current) return
+    setReady(false)
+    setCountry('India region')
     const root = am5.Root.new(chartHost.current)
     const responsive = am5themes_Responsive.new(root)
-    root.setThemes([am5themes_Animated.new(root), responsive])
+    root.setThemes([responsive])
 
     const chart = root.container.children.push(am5map.MapChart.new(root, {
       projection: am5map.geoOrthographic(),
       panX: 'rotateX',
       panY: 'rotateY',
-      wheelY: 'zoom',
+      wheelY: 'none',
       wheelX: 'none',
-      minZoomLevel: 0.85,
-      maxZoomLevel: 9,
-      homeZoomLevel: 1.05,
-      homeGeoPoint: { longitude: 78, latitude: 19 },
-      autoHome: true,
+      minZoomLevel: 0.82,
+      maxZoomLevel: 5,
+      zoomStep: 1.5,
+      homeZoomLevel: 0.92,
+      homeRotationX: -78,
+      homeRotationY: -19,
+      rotationX: -78,
+      rotationY: -19,
+      autoHome: false,
       paddingTop: 12,
       paddingRight: 12,
       paddingBottom: 12,
@@ -56,17 +71,23 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
     }))
     chartRef.current = chart
 
+    const ocean = chart.series.push(am5map.MapPolygonSeries.new(root, {}))
+    ocean.mapPolygons.template.setAll({ fill: am5.color(0xdcefe8), stroke: am5.color(0xb4d8c6), strokeWidth: 1.2, interactive: false })
+    ocean.data.push({ geometry: am5map.getGeoRectangle(90, 180, -90, -180) })
+
     const polygons = chart.series.push(am5map.MapPolygonSeries.new(root, { geoJSON: am5geodata_worldLow }))
     polygons.mapPolygons.template.setAll({
-      fill: am5.color(0xe2eee8),
-      fillOpacity: 0.92,
-      stroke: am5.color(0xffffff),
-      strokeWidth: 0.8,
+      fill: am5.color(0xa9cbb6),
+      fillOpacity: 0.98,
+      stroke: am5.color(0xf7fcf8),
+      strokeWidth: 0.95,
       interactive: true,
       tooltipText: '{name}',
       cursorOverStyle: 'pointer',
+      templateField: 'polygonSettings',
     })
-    polygons.mapPolygons.template.states.create('hover', { fill: am5.color(0xb9d8c9) })
+    polygons.data.setAll([{ id: 'IN', polygonSettings: { fill: am5.color(0x278e63) } }])
+    polygons.mapPolygons.template.states.create('hover', { fill: am5.color(0x78b693) })
     polygons.mapPolygons.template.states.create('active', { fill: am5.color(0x4b9579) })
     polygons.mapPolygons.template.events.on('click', event => {
       const polygon = event.target
@@ -74,39 +95,45 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
       if (!data) return
       const name = String((data.dataContext as { name?: string }).name ?? 'Selected country')
       setCountry(name)
-      chart.series.each(series => { if (series instanceof am5map.MapPolygonSeries) series.mapPolygons.each(item => item.set('active', false)) })
+      polygons.mapPolygons.each(item => item.set('active', false))
       polygon.set('active', true)
       const centroid = am5map.getGeoCentroid(data)
-      chart.zoomToGeoPoint(centroid, 2.8, true)
+      chart.animate({ key: 'rotationX', to: -centroid.longitude, duration: 650, easing: am5.ease.inOut(am5.ease.cubic) })
+      chart.animate({ key: 'rotationY', to: -centroid.latitude, duration: 650, easing: am5.ease.inOut(am5.ease.cubic) })
+      chart.animate({ key: 'zoomLevel', to: 1.25, duration: 650, easing: am5.ease.inOut(am5.ease.cubic) })
     })
 
     const graticule = chart.series.unshift(am5map.GraticuleSeries.new(root, {}))
-    graticule.mapLines.template.setAll({ stroke: am5.color(0x9ebcaf), strokeOpacity: 0.22, strokeWidth: 0.7 })
+    graticule.mapLines.template.setAll({ stroke: am5.color(0x82b59b), strokeOpacity: 0.3, strokeWidth: 0.7 })
 
     const routeSeries = chart.series.push(am5map.MapLineSeries.new(root, {}))
-    routeSeries.mapLines.template.setAll({ stroke: am5.color(0x3e9878), strokeOpacity: 0.72, strokeWidth: 2.2, interactive: true, cursorOverStyle: 'pointer' })
-    routeSeries.mapLines.template.events.on('click', event => {
+    routeSeries.mapLines.template.setAll({ stroke: am5.color(0x178263), strokeOpacity: 0.98, strokeWidth: 3.1, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
+    const boundaryRoutes = chart.series.push(am5map.MapLineSeries.new(root, {}))
+    boundaryRoutes.mapLines.template.setAll({ stroke: am5.color(0xc95f4e), strokeOpacity: 0.98, strokeWidth: 3.5, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
+    const inspectRoute = (event: { target: { dataItem?: { dataContext: unknown } } }) => {
       const transactionId = (event.target.dataItem?.dataContext as { transactionId?: string } | undefined)?.transactionId
-      if (typeof transactionId === 'string') onInspect(transactionId)
-    })
+      if (typeof transactionId === 'string') { setSelectedTransfer(transactionId); inspectRef.current(transactionId) }
+    }
+    routeSeries.mapLines.template.events.on('click', inspectRoute)
+    boundaryRoutes.mapLines.template.events.on('click', inspectRoute)
 
     const points = chart.series.push(am5map.MapPointSeries.new(root, {}))
     points.bullets.push((bulletRoot, _series, dataItem) => {
-      const data = dataItem.dataContext as { terminal?: boolean; title?: string; transactionId?: string }
+      const data = dataItem.dataContext as { source?: boolean; terminal?: boolean; title?: string; label?: string; transactionId?: string }
       const terminal = Boolean(data.terminal)
+      const source = Boolean(data.source)
       const container = am5.Container.new(bulletRoot, { interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
       container.children.push(am5.Circle.new(bulletRoot, {
-        radius: terminal ? 6 : 5,
-        fill: am5.color(terminal ? 0xc86e5e : 0x398d70),
+        radius: terminal || source ? 6.5 : 4.5,
+        fill: am5.color(terminal ? 0xc95f4e : source ? 0x397da8 : 0x168260),
         stroke: am5.color(0xffffff),
         strokeWidth: 2,
-        shadowColor: am5.color(terminal ? 0xc86e5e : 0x398d70),
+        shadowColor: am5.color(terminal ? 0xc95f4e : source ? 0x397da8 : 0x168260),
         shadowBlur: 9,
         shadowOpacity: 0.45,
       }))
-      const label = String(data.title ?? '')
-      container.children.push(am5.Label.new(bulletRoot, {
-        text: label,
+      if (data.label) container.children.push(am5.Label.new(bulletRoot, {
+        text: data.label,
         x: 9,
         y: -9,
         fontSize: 10,
@@ -119,81 +146,99 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
       }))
       container.events.on('click', () => {
         const transactionId = data.transactionId
-        if (typeof transactionId === 'string') onInspect(transactionId)
+        if (typeof transactionId === 'string') inspectRef.current(transactionId)
       })
       return am5.Bullet.new(bulletRoot, { sprite: container })
     })
 
     const movement = chart.series.push(am5map.MapPointSeries.new(root, {}))
+    movementRef.current = movement
     movement.bullets.push(bulletRoot => am5.Bullet.new(bulletRoot, {
-      sprite: am5.Circle.new(bulletRoot, { radius: 3.7, fill: am5.color(0x74d4aa), stroke: am5.color(0xffffff), strokeWidth: 1, shadowColor: am5.color(0x48a37f), shadowBlur: 12, shadowOpacity: 0.8 }),
+      sprite: am5.Circle.new(bulletRoot, { radius: 4.5, fill: am5.color(0x17b577), stroke: am5.color(0xffffff), strokeWidth: 1.3, shadowColor: am5.color(0x08764e), shadowBlur: 13, shadowOpacity: 0.9 }),
     }))
 
     const zoom = chart.set('zoomControl', am5map.ZoomControl.new(root, {}))
     zoom.homeButton.set('visible', true)
     zoom.homeButton.events.on('click', () => {
       setCountry('India region')
-      chart.goHome(900)
+      chart.goHome(650)
     })
 
     // Reuse the trace hops at illustrative places; the ledger does not contain account geolocation.
     const nodeIds = new Set([trace.victim_account, ...trace.nodes.map(node => node.account_id)])
     const nodePosition = new Map<string, [number, number]>()
-    let nodeIndex = 0
-    nodeIds.forEach(id => { nodePosition.set(id, illustrativeAnchors[nodeIndex % illustrativeAnchors.length]); nodeIndex += 1 })
-    routeSeries.data.setAll(flows.flatMap((flow, index) => {
+    let domesticIndex = 0
+    let externalIndex = 0
+    nodeIds.forEach(id => {
+      const node = trace.nodes.find(item => item.account_id === id)
+      if (node && !node.is_operating_institution) {
+        nodePosition.set(id, externalAnchors[externalIndex % externalAnchors.length])
+        externalIndex += 1
+      } else {
+        const anchor = domesticAnchors[domesticIndex % domesticAnchors.length]
+        const cycle = Math.floor(domesticIndex / domesticAnchors.length)
+        nodePosition.set(id, cycle ? [anchor[0] + cycle * 0.22, anchor[1] + cycle * 0.18] : anchor)
+        domesticIndex += 1
+      }
+    })
+    flows.forEach((flow, index) => {
       const start = nodePosition.get(flow.source_account)
       const end = nodePosition.get(flow.destination_account)
-      if (!start || !end) return []
-      return [{ geometry: { type: 'LineString' as const, coordinates: [start, end] }, transactionId: flow.transaction_id, index }]
-    }))
+      if (!start || !end) return
+      const series = flow.is_terminal ? boundaryRoutes : routeSeries
+      const route = series.pushDataItem({ geometry: { type: 'LineString', coordinates: [start, end] }, transactionId: flow.transaction_id, title: `Hop ${flow.hop} · ${flow.transaction_id}`, index } as am5map.IMapLineSeriesDataItem)
+      movement.pushDataItem({ lineDataItem: route, positionOnLine: 0 })
+    })
     points.data.setAll(Array.from(nodePosition.entries()).map(([id, position], index) => {
       const node = trace.nodes.find(item => item.account_id === id)
       const source = id === trace.victim_account
       const flow = source ? flows[0] : flows.find(item => item.source_account === id || item.destination_account === id)
       const terminal = Boolean(node && !node.is_operating_institution)
-      return { id, geometry: { type: 'Point' as const, coordinates: position }, title: source ? 'Reported source · schematic' : `${terminal ? 'Institution boundary' : `Hop ${node?.min_hop ?? index}`} · schematic`, terminal, transactionId: flow?.transaction_id }
+      return { id, geometry: { type: 'Point' as const, coordinates: position }, title: source ? 'Reported source · schematic' : `${terminal ? 'Institution boundary' : `Hop ${node?.min_hop ?? index}`} · schematic`, label: source ? 'SOURCE' : '', source, terminal, transactionId: flow?.transaction_id }
     }))
-    chart.appear(900, 100)
     polygons.events.on('datavalidated', () => {
-      if (!chart.get('homeGeoPoint')) chart.goHome(0)
+      chart.goHome(0)
       setReady(true)
     })
 
     return () => {
+      movementAnimations.current.forEach(animation => animation.stop())
+      movementAnimations.current = []
       chartRef.current = null
+      movementRef.current = null
       root.dispose()
     }
-  }, [trace.trace_id, onInspect])
+  }, [trace.trace_id, flows, trace.nodes, trace.victim_account])
 
   useEffect(() => {
-    const chart = chartRef.current
-    if (!chart) return
-    const routes = chart.series.values.find(series => series instanceof am5map.MapLineSeries) as am5map.MapLineSeries | undefined
-    const movement = chart.series.values.find(series => series instanceof am5map.MapPointSeries && series.dataItems.length > 0 && series.bullets.length > 0) as am5map.MapPointSeries | undefined
-    if (!routes || !movement) return
+    const movement = movementRef.current
+    if (!movement || !ready) return
+    movementAnimations.current.forEach(animation => animation.stop())
+    movementAnimations.current = []
     const items = movement.dataItems
-    const routeItems = routes.dataItems
     if (!playing) {
       items.forEach(item => item.set('visible', false))
       return
     }
     items.forEach((item, index) => {
       item.set('visible', true)
-      const route = routeItems[index % Math.max(1, routeItems.length)]
-      if (!route) return
-      item.set('lineDataItem', route)
-      item.animate({ key: 'positionOnLine', from: 0, to: 1, duration: 3800 + index * 400, loops: Infinity, easing: am5.ease.linear })
+      const animation = item.animate({ key: 'positionOnLine', from: 0, to: 1, duration: 3300 + index * 260, loops: Infinity, easing: am5.ease.linear })
+      if (animation) movementAnimations.current.push(animation)
     })
+    return () => {
+      movementAnimations.current.forEach(animation => animation.stop())
+      movementAnimations.current = []
+    }
   }, [playing, ready, trace.trace_id])
 
-  return <div className="money-globe-shell">
-    <div className="money-globe-topline"><span><i className="globe-live-dot"/> {country.toUpperCase()}</span><span className="globe-schematic-tag">SCHEMATIC MOVEMENT · NOT GEOGRAPHIC EVIDENCE</span></div>
+  return <div className={`money-globe-shell ${playing ? 'is-playing' : ''}`}>
+    <div className="money-globe-topline"><span><i className="globe-live-dot"/> {country.toUpperCase()} <em>DRAG TO ROTATE · USE + / − TO ZOOM</em></span><span className="globe-schematic-tag">SCHEMATIC ROUTES · NO ACCOUNT GEOLOCATION</span></div>
     <div className="money-globe-chart" ref={chartHost} aria-label="Interactive globe centered on India showing schematic transaction movement"/>
+    <div className="globe-route-reel"><div className="globe-route-heading"><span>TRACE MOVEMENT <b>{flows.length} transfers</b></span><span>SELECT A HOP TO VIEW EVIDENCE</span></div><div className="globe-route-track">{flows.map((flow, index) => <button type="button" key={flow.transaction_id} className={`globe-route-card ${flow.is_terminal ? 'is-boundary' : ''} ${selectedTransfer === flow.transaction_id ? 'is-selected' : ''}`} onClick={() => { setSelectedTransfer(flow.transaction_id); inspectRef.current(flow.transaction_id) }}><span className="globe-route-step"><i/>{index === 0 ? 'REPORTED' : `HOP ${flow.hop}`}</span><strong>{amount(flow.attributed_amount)}</strong><small>{index === 0 ? 'Reported payment' : flow.is_terminal ? 'Boundary · attributed' : `${flow.channel || 'Transfer'} · attributed`}</small></button>)}</div></div>
     <div className="money-globe-footer">
       <div><span className="globe-key-dot source-dot"/> Reported source <span className="globe-key-dot hop-dot"/> Ledger hop <span className="globe-key-dot boundary-dot"/> Institution boundary</div>
       <button type="button" onClick={onTogglePlaying} aria-label={playing ? 'Pause money movement' : 'Play money movement'}>{playing ? 'Ⅱ Pause movement' : '▶ Resume movement'}</button>
-      <small>Route positions are schematic across India; account locations are not supplied by this trace.</small>
+      <small>Ledger transfers are real to the trace; map locations are illustrative.</small>
     </div>
     {!ready && <div className="globe-loading">Loading country map…</div>}
   </div>
