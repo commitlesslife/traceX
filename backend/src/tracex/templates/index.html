@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACE-X — Fraud Flow Tracing System (MVP Demo)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="bg-indigo-600 text-white font-black px-2.5 py-1 rounded text-lg tracking-wider">TRACE-X</div>
+      <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-semibold">SYNTHETIC DEMO MODE</span>
+      <span class="text-xs text-slate-400">Hackathon V1 MVP</span>
+    </div>
+
+    <!-- Active User & Switcher -->
+    <div class="flex items-center space-x-4 text-sm">
+      <div id="userDisplay" class="flex items-center space-x-2 text-slate-300">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        <span id="userName" class="font-medium">Priya Sharma (Analyst)</span>
+        <span id="userRoleBadge" class="bg-indigo-900/60 text-indigo-300 text-xs px-2 py-0.5 rounded font-mono uppercase">analyst</span>
+      </div>
+      <div class="border-l border-slate-700 h-5"></div>
+      <div class="flex space-x-1.5 text-xs">
+        <button onclick="switchRole('analyst')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded transition border border-slate-700">Analyst Login</button>
+        <button onclick="switchRole('supervisor')" class="bg-purple-950/60 hover:bg-purple-900 text-purple-200 px-2.5 py-1 rounded transition border border-purple-800/50">Supervisor Login</button>
+        <button onclick="resetDemoFixture()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 px-2 py-1 rounded transition border border-rose-800/30" title="Reset Demo Data"><i class="fa-solid fa-rotate-right"></i> Reset</button>
+        <a href="/docs" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-indigo-400 px-2 py-1 rounded transition border border-slate-700"><i class="fa-solid fa-book-open"></i> API Docs</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+    <!-- Stepper Navigation Banner -->
+    <div class="grid grid-cols-4 gap-3 text-xs font-medium">
+      <div class="bg-slate-900 border border-indigo-500/40 p-3 rounded-lg flex items-center space-x-3">
+        <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">1</span>
+        <div>
+          <div class="text-indigo-400 font-semibold">Intake & Queue</div>
+          <div class="text-slate-400 text-[11px]">Seed Reference Match</div>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg flex items-center space-x-3">
+        <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold">2</span>
+        <div>
+          <div class="text-slate-200 font-semibold">Proportional Trace</div>
+          <div class="text-slate-400 text-[11px]">Paise-safe Conservation</div>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg flex items-center space-x-3">
+        <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold">3</span>
+        <div>
+          <div class="text-slate-200 font-semibold">Draft Recommendation</div>
+          <div class="text-slate-400 text-[11px]">Analyst Justification</div>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg flex items-center space-x-3">
+        <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold">4</span>
+        <div>
+          <div class="text-slate-200 font-semibold">Supervisor Review</div>
+          <div class="text-slate-400 text-[11px]">Separation of Duties</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1: Complaint & Action Bar -->
+    <section class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-indigo-400"></i> Active Complaint Case
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Golden fixture complaint received through National Cybercrime Reporting Portal (NCRP)</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button id="btnRunTrace" onclick="triggerTrace()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-lg flex items-center gap-2 shadow transition">
+            <i class="fa-solid fa-network-wired"></i> Run Proportional Trace
+          </button>
+          <button onclick="exportCasePack()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs px-3 py-2 rounded-lg flex items-center gap-2 border border-slate-700 transition">
+            <i class="fa-solid fa-file-code"></i> Export JSON Pack
+          </button>
+        </div>
+      </div>
+
+      <!-- Complaint Info Grid -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 bg-slate-950/70 p-4 rounded-lg border border-slate-800/80 text-xs">
+        <div>
+          <div class="text-slate-500 font-mono text-[10px] uppercase">Complaint ID</div>
+          <div id="dispComplaintId" class="font-mono font-bold text-slate-200 mt-1">Loading...</div>
+        </div>
+        <div>
+          <div class="text-slate-500 font-mono text-[10px] uppercase">Disputed Amount</div>
+          <div id="dispAmount" class="text-emerald-400 font-bold mt-1 text-sm">₹1,00,000.00</div>
+        </div>
+        <div>
+          <div class="text-slate-500 font-mono text-[10px] uppercase">Seed Transaction Ref</div>
+          <div id="dispSeedTx" class="font-mono text-indigo-300 mt-1">TX-SEED-100K</div>
+        </div>
+        <div>
+          <div class="text-slate-500 font-mono text-[10px] uppercase">Match Verification</div>
+          <div id="dispMatchStatus" class="mt-1 flex items-center gap-1.5 text-emerald-400 font-semibold">
+            <i class="fa-solid fa-circle-check"></i> Matched in Ledger
+          </div>
+        </div>
+        <div>
+          <div class="text-slate-500 font-mono text-[10px] uppercase">Operating Boundary</div>
+          <div class="text-amber-300 mt-1 flex items-center gap-1">
+            <i class="fa-solid fa-building-columns"></i> State Bank Ledger
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2: Trace Results & Conservation Grid -->
+    <section id="traceSection" class="hidden space-y-4">
+      
+      <!-- Conservation Summary Banner -->
+      <div class="bg-indigo-950/30 border border-indigo-800/40 rounded-xl p-4 flex items-center justify-between">
+        <div class="flex items-center space-x-6 text-xs">
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-mono">Seed Inflow</div>
+            <div class="font-bold text-slate-100 text-sm">₹1,00,000.00</div>
+          </div>
+          <div class="text-slate-600 font-mono">=</div>
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-mono">Total Unmoved (Upper Bound)</div>
+            <div id="sumUnmoved" class="font-bold text-indigo-300 text-sm">₹0.00</div>
+          </div>
+          <div class="text-slate-600 font-mono">+</div>
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-mono">Crossed Inter-Bank Boundary</div>
+            <div id="sumCrossed" class="font-bold text-amber-400 text-sm">₹0.00</div>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="inline-flex items-center gap-1.5 bg-emerald-950/60 text-emerald-400 text-xs px-3 py-1 rounded-full font-mono border border-emerald-800/40">
+            <i class="fa-solid fa-check-double"></i> Exact Paise Conservation Verified
+          </span>
+          <div id="traceResultHash" class="text-[10px] font-mono text-slate-500 mt-1">Hash: computing...</div>
+        </div>
+      </div>
+
+      <!-- Two-column view: Trace Flow Nodes + Timeline Edges -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Column 1: Accounts / Holdings Under Review -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-wallet text-indigo-400"></i> Traced Accounts Decomposition
+            </h3>
+            <span class="text-[11px] text-slate-400">4 Distinct Values Per Account</span>
+          </div>
+
+          <!-- Nodes List Container -->
+          <div id="nodesList" class="space-y-3 flex-1 overflow-y-auto max-h-[420px] pr-1">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Column 2: Edges & Boundaries (Hop Flow) -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-diagram-project text-emerald-400"></i> Attribution Transfer Timeline
+            </h3>
+            <span class="text-[11px] text-slate-400">Proportional Pooled Inflow</span>
+          </div>
+
+          <!-- Edges List Container -->
+          <div id="edgesList" class="space-y-3 flex-1 overflow-y-auto max-h-[420px] pr-1">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- Step 3 & 4: Recommendation Drafting & Review Pane -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Analyst Drafting Card -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-2">
+          <i class="fa-solid fa-file-signature text-indigo-400"></i> 1. Analyst Recommendation Draft
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">Select target accounts and amounts capped by freezable estimate or unmoved upper bound.</p>
+
+        <form id="draftForm" onsubmit="submitRecommendationDraft(event)" class="space-y-3 text-xs">
+          <div>
+            <label class="block text-slate-400 mb-1">Target Account</label>
+            <select id="draftAccount" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200">
+              <option value="ACC-A-101">ACC-A-101 (Mule A) - Max ₹48,000.00 (Balance Known)</option>
+              <option value="ACC-C-303">ACC-C-303 (Mule C) - Max ₹5,000.00 (Freezable Est Capped)</option>
+              <option value="ACC-B-202">ACC-B-202 (Mule B) - Max ₹40,000.00 (Balance Unknown Caveat)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Recommended Amount (₹)</label>
+            <input type="number" id="draftAmount" value="48000" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200" step="0.01">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Investigator Written Justification</label>
+            <textarea id="draftJustification" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-200">Victim funds traced directly via UPI. Account A retained ₹48,000 after downstream dispersion.</textarea>
+          </div>
+          <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded transition shadow">
+            Submit Recommendation for Supervisor Approval
+          </button>
+        </form>
+      </div>
+
+      <!-- Supervisor Independent Approval Card -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-user-check text-purple-400"></i> 2. Supervisor Independent Review
+          </h3>
+          <span class="text-[10px] bg-rose-950/60 text-rose-300 border border-rose-800/40 px-2 py-0.5 rounded font-mono">ENFORCES 2-PERSON RULE</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Separation of duties: The author cannot approve their own draft. Approval generates an exportable document only.</p>
+
+        <div id="pendingReviewBox" class="bg-slate-950/70 border border-slate-800 rounded-lg p-3 text-xs space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 font-mono text-[11px]" id="recIdLabel">No pending draft loaded</span>
+            <span id="recStatusBadge" class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-mono">DRAFT</span>
+          </div>
+          <div id="recSummaryText" class="text-slate-300 text-xs">Run a trace and submit a draft on the left first.</div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-800">
+            <label class="block text-slate-400 text-[11px]">Supervisor Decision Reason (Required)</label>
+            <input type="text" id="supReason" placeholder="Evidence verified against ledger timestamps." value="Verified ledger timestamps and attribution fractions. Approved." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 text-xs">
+            
+            <div class="flex space-x-2 pt-1">
+              <button onclick="decideDraft('approved')" class="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-1.5 rounded text-xs transition">
+                <i class="fa-solid fa-check"></i> Approve Recommendation Document
+              </button>
+              <button onclick="decideDraft('rejected')" class="bg-rose-900/80 hover:bg-rose-800 text-rose-200 font-medium px-4 py-1.5 rounded text-xs transition">
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Document Result preview -->
+        <div id="approvedDocBox" class="hidden mt-3 p-3 bg-emerald-950/30 border border-emerald-800/50 rounded-lg text-xs space-y-1">
+          <div class="text-emerald-400 font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-file-shield"></i> Recommendation Document Generated
+          </div>
+          <div class="text-[11px] text-slate-300" id="docDetails">Document hash generated and verified.</div>
+          <div class="text-[10px] text-slate-500 italic mt-1">* Note: Document only. No external banking API is called.</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Audit Log Feed -->
+    <section class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-lg">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-slate-400"></i> Append-Only Case Audit Trail
+        </h3>
+        <button onclick="refreshAudit()" class="text-xs text-indigo-400 hover:underline"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+      </div>
+      <div id="auditFeed" class="space-y-1.5 max-h-48 overflow-y-auto text-xs font-mono text-slate-400 pr-1">
+        <!-- Dynamically populated -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950 py-3 px-6 text-center text-xs text-slate-500">
+    TRACE-X Hackathon Prototype &bull; Pure Proportional-Pooled-Inflow Tracing &bull; Evaluated for VISTERA Demo
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    const API_BASE = "/api/v1";
+    let token = "";
+    let currentUser = { username: "analyst_priya", role: "analyst", name: "Priya Sharma (Analyst)" };
+    let currentTrace = null;
+    let currentDraft = null;
+
+    // 1. Initial Login & Setup
+    async function switchRole(role) {
+      const username = role === "analyst" ? "analyst_priya" : "supervisor_rajesh";
+      const password = role === "analyst" ? "analyst123" : "supervisor123";
+      
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData
+        });
+        if (!res.ok) throw new Error("Login failed");
+        const data = await res.json();
+        token = data.access_token;
+        currentUser = {
+          username: data.username,
+          role: data.role,
+          name: data.display_name
+        };
+        document.getElementById("userName").innerText = data.display_name;
+        document.getElementById("userRoleBadge").innerText = data.role;
+        document.getElementById("userRoleBadge").className = data.role === "analyst" 
+          ? "bg-indigo-900/60 text-indigo-300 text-xs px-2 py-0.5 rounded font-mono uppercase" 
+          : "bg-purple-900/60 text-purple-300 text-xs px-2 py-0.5 rounded font-mono uppercase";
+        
+        refreshAudit();
+        loadPendingDrafts();
+      } catch (err) {
+        alert("Auth error: " + err.message);
+      }
+    }
+
+    // 2. Load Complaint
+    async function loadComplaint() {
+      try {
+        const res = await fetch(`${API_BASE}/complaints`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.complaints && data.complaints.length > 0) {
+          const c = data.complaints[0];
+          document.getElementById("dispComplaintId").innerText = c.id;
+          document.getElementById("dispAmount").innerText = `₹${parseFloat(c.disputed_amount).toLocaleString('en-IN')}`;
+          document.getElementById("dispSeedTx").innerText = c.disputed_transaction_ref;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 3. Trigger Trace
+    async function triggerTrace() {
+      const btn = document.getElementById("btnRunTrace");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Tracing...`;
+
+      try {
+        const compId = document.getElementById("dispComplaintId").innerText;
+        const res = await fetch(`${API_BASE}/complaints/${compId}/traces`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            max_hops: 6,
+            horizon_hours: 72,
+            min_amount: 100.0,
+            work_budget_edges: 50000
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Trace execution error");
+        }
+
+        const trace = await res.json();
+        currentTrace = trace;
+        renderTrace(trace);
+        refreshAudit();
+      } catch (err) {
+        alert("Trace failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-network-wired"></i> Run Proportional Trace`;
+      }
+    }
+
+    // 4. Render Trace Results
+    function renderTrace(trace) {
+      document.getElementById("traceSection").classList.remove("hidden");
+      document.getElementById("sumUnmoved").innerText = `₹${parseFloat(trace.total_unmoved_value).toLocaleString('en-IN')}`;
+      document.getElementById("sumCrossed").innerText = `₹${parseFloat(trace.crossed_boundary_value).toLocaleString('en-IN')}`;
+      document.getElementById("traceResultHash").innerText = `Canonical SHA-256: ${trace.result_hash.substring(0, 16)}...`;
+
+      // Render Nodes (Accounts)
+      const nodesList = document.getElementById("nodesList");
+      nodesList.innerHTML = "";
+      trace.nodes.forEach(n => {
+        const isBoundary = !n.is_operating_institution;
+        const balLabel = n.balance_status === "known" ? `₹${parseFloat(n.available_balance).toLocaleString('en-IN')}` : `<span class="text-amber-400 font-semibold">balance unknown</span>`;
+        const freezableLabel = n.freezable_estimate !== null ? `₹${parseFloat(n.freezable_estimate).toLocaleString('en-IN')}` : `<span class="text-slate-500">N/A (No balance)</span>`;
+
+        const card = document.createElement("div");
+        card.className = `p-3 rounded-lg border text-xs ${isBoundary ? 'bg-amber-950/20 border-amber-800/40' : 'bg-slate-950/60 border-slate-800'}`;
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="font-bold font-mono text-slate-200 flex items-center gap-1.5">
+              ${isBoundary ? '<i class="fa-solid fa-building-columns text-amber-400"></i>' : '<i class="fa-solid fa-user-shield text-indigo-400"></i>'}
+              ${n.account_id}
+            </span>
+            <span class="font-mono text-[10px] px-2 py-0.5 rounded ${isBoundary ? 'bg-amber-900/40 text-amber-300' : 'bg-slate-800 text-slate-300'}">
+              Hop ${n.min_hop} &bull; Conf: ${(n.confidence * 100).toFixed(1)}%
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-400 mt-2">
+            <div>Traced In: <span class="text-slate-200 font-semibold">₹${parseFloat(n.traced_in).toLocaleString('en-IN')}</span></div>
+            <div>Traced Out: <span class="text-slate-200 font-semibold">₹${parseFloat(n.traced_out).toLocaleString('en-IN')}</span></div>
+            <div>Unmoved (Upper Bound): <span class="text-indigo-400 font-bold">₹${parseFloat(n.unmoved_traced_value).toLocaleString('en-IN')}</span></div>
+            <div>Available Balance: ${balLabel}</div>
+          </div>
+          ${n.freezable_estimate !== null ? `
+            <div class="mt-2 pt-1.5 border-t border-slate-800 flex justify-between text-[11px]">
+              <span class="text-emerald-400 font-medium">Freezable Estimate (Min):</span>
+              <span class="text-emerald-300 font-bold">${freezableLabel}</span>
+            </div>` : ''}
+          ${isBoundary ? `<div class="mt-2 text-[10px] text-amber-400/90 font-mono"><i class="fa-solid fa-ban"></i> ${n.termination_reason || 'External Bank Boundary Cutoff'}</div>` : ''}
+        `;
+        nodesList.appendChild(card);
+      });
+
+      // Render Edges
+      const edgesList = document.getElementById("edgesList");
+      edgesList.innerHTML = "";
+      trace.edges.forEach(e => {
+        const row = document.createElement("div");
+        row.className = "p-3 rounded-lg bg-slate-950/60 border border-slate-800 text-xs";
+        row.innerHTML = `
+          <div class="flex justify-between items-center text-slate-300">
+            <span class="font-mono font-medium">${e.source_account} &rarr; <span class="${e.is_terminal ? 'text-amber-400 font-semibold' : 'text-indigo-300'}">${e.destination_account}</span></span>
+            <span class="text-[10px] font-mono text-slate-500">${e.channel} &bull; ${new Date(e.timestamp_utc).toLocaleTimeString()}</span>
+          </div>
+          <div class="flex justify-between items-center mt-2 text-[11px]">
+            <span class="text-slate-400">Ledger Amount: ₹${parseFloat(e.raw_amount).toLocaleString('en-IN')}</span>
+            <span class="text-emerald-400 font-bold">Attributed: ₹${parseFloat(e.attributed_amount).toLocaleString('en-IN')} (Fraction: ${e.fraction})</span>
+          </div>
+          ${e.is_terminal ? `<div class="mt-1 text-[10px] text-amber-400 font-mono"><i class="fa-solid fa-arrow-up-right-from-square"></i> Terminal Hop: crossed out of operating ledger</div>` : ''}
+        `;
+        edgesList.appendChild(row);
+      });
+    }
+
+    // 5. Submit Recommendation Draft
+    async function submitRecommendationDraft(e) {
+      e.preventDefault();
+      if (!currentTrace) {
+        alert("Please run trace first!");
+        return;
+      }
+      const acc = document.getElementById("draftAccount").value;
+      const amt = document.getElementById("draftAmount").value;
+      const just = document.getElementById("draftJustification").value;
+
+      try {
+        const res = await fetch(`${API_BASE}/cases/CASE-2026-0891/recommendations`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            trace_id: currentTrace.trace_id,
+            selected_accounts: [{ account_id: acc, amount: parseFloat(amt), basis: "traced_unmoved_funds" }],
+            justification: just
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Draft submission failed");
+        }
+
+        const draft = await res.json();
+        alert("Recommendation draft created: " + draft.recommendation_id);
+        loadPendingDrafts();
+        refreshAudit();
+      } catch (err) {
+        alert("Draft Error: " + err.message);
+      }
+    }
+
+    // 6. Load Pending Drafts
+    async function loadPendingDrafts() {
+      try {
+        const res = await fetch(`${API_BASE}/recommendations?status_filter=draft`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.recommendations && data.recommendations.length > 0) {
+          currentDraft = data.recommendations[0];
+          document.getElementById("recIdLabel").innerText = currentDraft.id;
+          document.getElementById("recStatusBadge").innerText = currentDraft.status.toUpperCase();
+          document.getElementById("recSummaryText").innerHTML = `
+            <strong>Total Amount:</strong> ₹${parseFloat(currentDraft.total_recommended_amount).toLocaleString('en-IN')}<br>
+            <strong>Author ID:</strong> ${currentDraft.author_id}<br>
+            <strong>Justification:</strong> ${currentDraft.justification}
+          `;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 7. Decide Draft (Supervisor Only)
+    async function decideDraft(decision) {
+      if (!currentDraft) {
+        alert("No draft available to review.");
+        return;
+      }
+      const reason = document.getElementById("supReason").value;
+      try {
+        const res = await fetch(`${API_BASE}/recommendations/${currentDraft.id}/decision`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ decision, reason })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Decision error");
+        }
+
+        const result = await res.json();
+        alert(`Draft ${decision.toUpperCase()} successfully by supervisor!`);
+        
+        if (decision === "approved") {
+          document.getElementById("approvedDocBox").classList.remove("hidden");
+          document.getElementById("docDetails").innerText = `Document Hash: ${result.document_hash} (Approved by ${result.decided_by})`;
+        }
+        refreshAudit();
+        loadPendingDrafts();
+      } catch (err) {
+        alert("Review Failed: " + err.message);
+      }
+    }
+
+    // 8. Refresh Audit Log
+    async function refreshAudit() {
+      try {
+        const res = await fetch(`${API_BASE}/audit?limit=15`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const feed = document.getElementById("auditFeed");
+        feed.innerHTML = "";
+        data.audit_events.forEach(ev => {
+          const line = document.createElement("div");
+          line.className = "flex justify-between py-1 border-b border-slate-800/60";
+          line.innerHTML = `
+            <span><strong class="text-indigo-400">[${ev.action}]</strong> ${ev.actor_role} (${ev.actor_user_id}) &bull; Target: ${ev.target_id}</span>
+            <span class="text-slate-500">${new Date(ev.occurred_at).toLocaleTimeString()}</span>
+          `;
+          feed.appendChild(line);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 9. Export Case Pack
+    async function exportCasePack() {
+      try {
+        const res = await fetch(`${API_BASE}/cases/CASE-2026-0891/exports`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `CASE-2026-0891-EXPORT-${data.export_metadata.content_hash.substring(0, 8)}.json`;
+        a.click();
+      } catch (err) {
+        alert("Export failed: " + err.message);
+      }
+    }
+
+    // 10. Reset Demo Fixture
+    async function resetDemoFixture() {
+      if (!confirm("Reset database to initial golden demo fixture?")) return;
+      try {
+        // Switch to supervisor or admin to reset
+        await switchRole("supervisor");
+        const res = await fetch(`${API_BASE}/demo/reset`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        alert("Demo state reset successfully!");
+        window.location.reload();
+      } catch (err) {
+        alert("Reset failed: " + err.message);
+      }
+    }
+
+    // Initialize on window load
+    window.addEventListener("DOMContentLoaded", async () => {
+      await switchRole("analyst");
+      await loadComplaint();
+      await refreshAudit();
+    });
+  </script>
+</body>
+</html>
