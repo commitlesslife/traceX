@@ -59,6 +59,8 @@ python backend/src/tracex/seed_demo.py
    - Point out account `ACC-B-202` shows **`balance unknown`** because ledger history is incomplete.
    - Point out the external boundary transfer to `HDFC_EXT` flagged with cutoff reason: `Crossed operating institution into External Partner Bank`.
 
+   - For a larger graph and multi-hop view, open stress case `CASE-2026-0888` (`CMP-2026-0888`, seed `TX-DEEP-SEED-100K`). This synthetic branching trail reaches six hops across 19 accounts and includes an external-institution boundary. Its raw transfer amounts are not the attributed amounts: the pooled-funds rule recalculates each edge, while the trace still conserves the ₹1,00,000 seed across in-ledger value and boundary value.
+
 3. **Recommendation Draft (20 sec):**
    - Under Analyst Recommendation Draft, select `ACC-A-101`, amount `₹44,800.00`, enter justification, and submit draft.
    - Show draft status: `DRAFT`.

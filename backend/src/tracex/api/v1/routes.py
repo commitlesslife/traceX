@@ -141,6 +141,82 @@ def list_complaints(db: Session = Depends(get_db), current_user: User = Depends(
     return {"complaints": results, "server_as_of": now.isoformat()}
 
 
+@router.get("/cases", tags=["Cases"])
+def list_cases(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return case summaries for the investigation workspace."""
+    rows = db.query(Case, Complaint).join(Complaint, Complaint.id == Case.complaint_id).order_by(Case.created_at.desc()).all()
+    cases = []
+    for case, complaint in rows:
+        latest_trace = db.query(StoredTraceRun).filter(StoredTraceRun.case_id == case.id).order_by(StoredTraceRun.created_at.desc()).first()
+        cases.append({
+            "case_id": case.id,
+            "complaint_id": complaint.id,
+            "status": case.status,
+            "disposition": case.disposition,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "victim_account": complaint.victim_account,
+            "disputed_transaction_ref": complaint.disputed_transaction_ref,
+            "disputed_amount": str(complaint.disputed_amount),
+            "reported_time": complaint.reported_time.isoformat() if complaint.reported_time else None,
+            "match_status": complaint.match_status,
+            "latest_trace_id": latest_trace.id if latest_trace else None,
+        })
+    return {"cases": cases}
+
+
+@router.get("/cases/{id}", tags=["Cases"])
+def get_case(id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    case = db.query(Case).filter(Case.id == id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    complaint = db.query(Complaint).filter(Complaint.id == case.complaint_id).first()
+    latest_trace = db.query(StoredTraceRun).filter(StoredTraceRun.case_id == id).order_by(StoredTraceRun.created_at.desc()).first()
+    recommendations = db.query(RecommendationDraft).filter(RecommendationDraft.case_id == id).order_by(RecommendationDraft.created_at.desc()).all()
+    return {
+        "case_id": case.id,
+        "complaint_id": complaint.id if complaint else None,
+        "status": case.status,
+        "disposition": case.disposition,
+        "created_at": case.created_at.isoformat() if case.created_at else None,
+        "complaint": {
+            "id": complaint.id,
+            "victim_account": complaint.victim_account,
+            "disputed_transaction_ref": complaint.disputed_transaction_ref,
+            "disputed_amount": str(complaint.disputed_amount),
+            "reported_time": complaint.reported_time.isoformat() if complaint.reported_time else None,
+            "channel": complaint.channel,
+            "match_status": complaint.match_status,
+            "matched_transaction_id": complaint.matched_transaction_id,
+        } if complaint else None,
+        "latest_trace_id": latest_trace.id if latest_trace else None,
+        "recommendation_ids": [r.id for r in recommendations],
+    }
+
+
+@router.get("/transactions/{id}", tags=["Evidence & Inspection"])
+def get_transaction(id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    tx = db.query(Transaction).filter(Transaction.transaction_id == id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    src = db.query(Account).filter(Account.id == tx.source_account_id).first()
+    dst = db.query(Account).filter(Account.id == tx.destination_account_id).first()
+    return {
+        "transaction_id": tx.transaction_id,
+        "amount": str(tx.amount),
+        "currency": tx.currency,
+        "timestamp_utc": tx.timestamp_utc.isoformat(),
+        "channel": tx.channel,
+        "status": tx.status,
+        "source_account_id": tx.source_account_id,
+        "source_key": src.pseudonymous_key if src else tx.source_account_id,
+        "destination_account_id": tx.destination_account_id,
+        "destination_key": dst.pseudonymous_key if dst else tx.destination_account_id,
+        "source_institution_id": tx.source_institution_id,
+        "destination_institution_id": tx.destination_institution_id,
+        "dataset_id": tx.dataset_id,
+    }
+
+
 @router.post("/complaints", tags=["Complaints"])
 def intake_complaint(
     req: ComplaintCreateRequest,
