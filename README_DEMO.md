@@ -1,85 +1,57 @@
-# TRACE-X Hackathon V1 MVP — Runbook & Verification Guide
+# TRACE-X demo runbook
 
-## 1. Overview
-TRACE-X is a deployable fraud tracing system for bank fraud operations teams and police cyber cells.
-It follows victim funds through a transaction ledger, enforces exact paise-level money conservation, respects institutional boundaries, ensures separation of duties between analyst and supervisor, and generates auditable evidence-backed case files.
+## Launch
 
----
+Build the frontend, then start the API from the repository root:
 
-## 2. Quickstart: One-Command Launch
-
-### Start the Server
-Run from the repository root:
 ```powershell
-$env:PYTHONPATH="d:\TrackX\backend\src"
-python -m uvicorn tracex.main:app --host 127.0.0.1 --port 8000 --reload
+cd D:\TrackX\frontend
+npm install
+npm run build
+cd D:\TrackX
+$env:PYTHONPATH='D:\TrackX\backend\src'
+py -3 -m uvicorn tracex.main:app --host 127.0.0.1 --port 8000
 ```
 
-Once running:
-- **Interactive Prototype UI Template:** [http://127.0.0.1:8000/](http://127.0.0.1:8000/) or [http://127.0.0.1:8000/template](http://127.0.0.1:8000/template)
-- **Interactive OpenAPI Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Service Readiness:** [http://127.0.0.1:8000/health/ready](http://127.0.0.1:8000/health/ready)
+Open <http://127.0.0.1:8000/>. API docs: <http://127.0.0.1:8000/docs>.
 
----
+The synthetic demo accounts are `analyst_priya` / `analyst123`, `supervisor_rajesh` / `supervisor123`, `admin_user` / `admin123`, and `auditor_user` / `auditor123`.
 
-## 3. Seeded Demo Identities
+## Cases for the stage
 
-| Username | Password | Role | Display Name | Permissions |
-|---|---|---|---|---|
-| `analyst_priya` | `analyst123` | **Analyst** | Priya Sharma | Intake complaints, execute traces, draft recommendations |
-| `supervisor_rajesh` | `supervisor123` | **Supervisor** | Rajesh Verma | Review & approve/reject drafts (cannot self-approve) |
-| `admin_user` | `admin123` | **Admin** | Admin Ops | System config, dataset reset, all analyst tasks |
-| `auditor_user` | `auditor123` | **Auditor** | Audit Cell Lead | Read-only inspection of cases, traces, and audit trail |
+| Case | Reported | Trail | Demonstrates |
+| --- | ---: | --- | --- |
+| `CASE-2026-0891` | ₹1,00,000 | Compact | Pooled funds and an external ledger boundary |
+| `CASE-2026-0888` | ₹1,00,000 | Six hops, 18 transfers | Branching with partial attribution |
+| `CASE-2026-0877` | ₹1,80,000 | Eight hops, 20 transfers | Long ladder and a synthetic international boundary |
+| `CASE-2026-0866` | ₹1,25,000 | Seven hops, 15 transfers | Domestic and international boundaries |
 
----
+For a long trail, open `CASE-2026-0877`, run the ledger trace, and switch from **Network** to **Globe**. India faces forward. Drag to rotate, scroll or pinch to zoom, and use **Home** to return to the India view. Hop chips focus the sequence. Selecting a transfer highlights its route and opens its ledger evidence. The focused strip distinguishes the full transfer from the amount attributed to the reported payment. Pause and resume the moving money marker during discussion.
 
-## 4. Resetting Demo State
-To restore the clean golden fixture state at any time:
+For two separate boundaries, open `CASE-2026-0866`. One boundary is a separate domestic institution; the other is a synthetic international processor. Map positions are **presentation anchors**: the ledger has no verified account coordinates. Never present the displayed city or country as a real transaction location.
+
+The graph, hop timeline, evidence drawer, and globe use the same trace result. The network graph remains horizontally scrollable for longer fixtures.
+
+## Reset demo data
+
+The seed command replaces local demo records, including stored traces and drafts. Back up `D:\TrackX\tracex_mvp.db` first if the current session matters:
+
 ```powershell
-$env:PYTHONPATH="d:\TrackX\backend\src"
-python backend/src/tracex/seed_demo.py
+$env:PYTHONPATH='D:\TrackX\backend\src'
+py -3 backend/src/tracex/seed_demo.py
 ```
-*(Or click the **Reset** button in the prototype UI top navigation bar)*
 
----
+The reset creates all four cases. It does not call a bank or freeze an account.
 
-## 5. End-to-End Walkthrough Script (for Judges & Demo)
+## Checks
 
-1. **Intake & Exact Ledger Resolution (20 sec):**
-   - Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) logged in as `analyst_priya`.
-   - Inspect active complaint `CMP-2026-0891` (Victim ₹1,00,000, seed `TX-SEED-100K`).
-   - Note match verification status: `matched` in ledger.
-
-2. **Deterministic Proportional Trace (40 sec):**
-   - Click **Run Proportional Trace**.
-   - Show the money decomposition summary:
-     - `Seed Inflow = Total Unmoved + Crossed Boundary` (Exact paise conservation).
-   - Point out the 4 quantities per account:
-     - `Traced In`, `Traced Out`, `Unmoved (Upper Bound)`, `Available Balance`.
-   - Point out account `ACC-B-202` shows **`balance unknown`** because ledger history is incomplete.
-   - Point out the external boundary transfer to `HDFC_EXT` flagged with cutoff reason: `Crossed operating institution into External Partner Bank`.
-
-   - For a larger graph and multi-hop view, open stress case `CASE-2026-0888` (`CMP-2026-0888`, seed `TX-DEEP-SEED-100K`). This synthetic branching trail reaches six hops across 19 accounts and includes an external-institution boundary. Its raw transfer amounts are not the attributed amounts: the pooled-funds rule recalculates each edge, while the trace still conserves the ₹1,00,000 seed across in-ledger value and boundary value.
-
-3. **Recommendation Draft (20 sec):**
-   - Under Analyst Recommendation Draft, select `ACC-A-101`, amount `₹44,800.00`, enter justification, and submit draft.
-   - Show draft status: `DRAFT`.
-
-4. **Separation of Duties & Supervisor Independent Review (30 sec):**
-   - Switch role to `supervisor_rajesh` via the top navigation switcher.
-   - Attempting to self-approve as an analyst is rejected with HTTP 403.
-   - As supervisor, enter decision reason and click **Approve Recommendation Document**.
-   - Show the generated cryptographic document hash. Note the explicit safety disclaimer: *Approval generates a case document only; zero external HTTP/freeze calls.*
-
-5. **Verifiable Export (10 sec):**
-   - Click **Export JSON Pack**.
-   - Inspect the downloaded JSON bundle featuring evidence snapshots, trace parameters, stopping reasons, and top-level canonical `content_hash`.
-
----
-
-## 6. Running Tests
-To run the automated test suite verifying golden fixture invariants and API RBAC:
 ```powershell
-$env:PYTHONPATH="d:\TrackX\backend\src"
-python -m pytest backend/tests/ -v
+cd D:\TrackX\frontend
+npm run build
+cd D:\TrackX\backend
+$env:PYTHONPATH='D:\TrackX\backend\src'
+$env:DATABASE_URL='sqlite:///./tracex_validation.db'
+py -3 -m pytest tests/unit/test_api_workflow.py -q
 ```
+
+The extended fixture checks assert hop depth, transfer count, boundary count, unique transaction IDs, and exact money conservation.

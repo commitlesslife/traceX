@@ -17,7 +17,7 @@ import json
 
 from tracex.main import app
 from tracex.seed_demo import seed_database
-from tracex.repositories.db import SessionLocal, Complaint, User
+from tracex.repositories.db import SessionLocal, Complaint, Case, User
 from tracex.services.app_service import execute_trace_for_complaint
 from tracex.domain.models import TraceParameters
 
@@ -179,6 +179,37 @@ def test_deep_branching_fixture_respects_shorter_hop_limit():
         assert max(edge.hop for edge in trace.edges) == 3
         assert any(reason["reason"] == "max_hops_reached" for reason in trace.stopping_reasons)
         assert trace.total_unmoved_value + trace.crossed_boundary_value == trace.seed_amount
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    "case_id, expected_hops, minimum_edges, expected_boundaries",
+    [
+        ("CASE-2026-0877", 8, 20, 1),
+        ("CASE-2026-0866", 7, 15, 2),
+    ],
+)
+def test_extended_demo_trails(case_id, expected_hops, minimum_edges, expected_boundaries):
+    """Long fixtures expose every hop, preserve value, and mark ledger exits."""
+    seed_database()
+    db = SessionLocal()
+    try:
+        case = db.query(Case).filter_by(id=case_id).one()
+        complaint = db.query(Complaint).filter_by(id=case.complaint_id).one()
+        analyst = db.query(User).filter_by(username="analyst_priya").one()
+        trace = execute_trace_for_complaint(
+            db=db,
+            complaint_id=complaint.id,
+            parameters=TraceParameters(max_hops=8, horizon_hours=72, min_amount=Decimal("1000.00")),
+            actor=analyst,
+        )
+        assert trace.complete is True
+        assert len(trace.edges) >= minimum_edges
+        assert max(edge.hop for edge in trace.edges) == expected_hops
+        assert sum(edge.is_terminal for edge in trace.edges) == expected_boundaries
+        assert trace.total_unmoved_value + trace.crossed_boundary_value == trace.seed_amount
+        assert len({edge.transaction_id for edge in trace.edges}) == len(trace.edges)
     finally:
         db.close()
 

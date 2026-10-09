@@ -1,6 +1,6 @@
 """Deterministic Seed and Reset Script for TRACE-X.
-Seeds demo users, institutions, the original golden fixture, and a deeper
-branching six-hop fixture for exercising larger graph and timeline views:
+Seeds demo users, institutions, the original golden fixture, and three
+longer trails for exercising the graph, map, and timeline views:
   - Operating Institution (Bank A) + External Institution (Bank B / Inter-bank)
   - Accounts with complete history vs incomplete history (testing balance known vs unknown)
   - Golden Fixture transactions:
@@ -11,6 +11,8 @@ branching six-hop fixture for exercising larger graph and timeline views:
       A -> ExtBank ₹15,000 (10:25) [Boundary test branch]
   - CASE-2026-0891: original compact proportional-attribution example.
   - CASE-2026-0888: 19-account, six-hop branching trail with a boundary edge.
+  - CASE-2026-0877: eight-hop ladder with a synthetic international boundary.
+  - CASE-2026-0866: seven-hop trail with domestic and international boundaries.
 """
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
@@ -27,8 +29,69 @@ from tracex.repositories.db import (
     Complaint,
     Case,
     AuditEvent,
+    StoredTraceRun,
+    RecommendationDraft,
 )
 from tracex.auth.security import hash_password
+
+
+def add_extended_case(db, dataset_id, *, suffix, prefix, seed_amount, start, transfers, international_keys=()):
+    """Add one isolated synthetic trail with its own victim and account set."""
+    keys = {"VIC", "A"}
+    for source, destination, _, _, _ in transfers:
+        keys.update((source, destination))
+
+    accounts = {}
+    for key in sorted(keys):
+        external = key.startswith("EXT")
+        complete = key == "VIC" or (not external and key not in {"E", "H", "N"})
+        accounts[key] = Account(
+            id=f"ACC-{prefix}-{key}",
+            pseudonymous_key=f"PSEUDO-{prefix}-{key}",
+            institution_id="INST-INTL-03" if key in international_keys else "INST-EXT-02" if external else "INST-OP-01",
+            opening_balance=Decimal(seed_amount) if key == "VIC" else Decimal("0.00") if complete else None,
+            opening_balance_at=datetime(2026, 10, 1, tzinfo=timezone.utc) if complete else None,
+            history_complete=complete,
+            account_type="savings" if key == "VIC" else "current",
+        )
+    db.add_all(accounts.values())
+
+    rows = [("VIC", "A", seed_amount, 0, "UPI"), *transfers]
+    for source, destination, amount, minute, channel in rows:
+        db.add(Transaction(
+            id=str(uuid.uuid4()),
+            transaction_id=f"TX-{prefix}-{source}-{destination}",
+            source_account_id=accounts[source].id,
+            destination_account_id=accounts[destination].id,
+            amount=Decimal(amount),
+            currency="INR",
+            timestamp_utc=start + timedelta(minutes=minute),
+            original_offset="+05:30",
+            status="completed",
+            channel=channel,
+            source_institution_id=accounts[source].institution_id,
+            destination_institution_id=accounts[destination].institution_id,
+            dataset_id=dataset_id,
+        ))
+
+    complaint = Complaint(
+        id=f"CMP-2026-{suffix}",
+        victim_account=accounts["VIC"].pseudonymous_key,
+        disputed_transaction_ref=f"TX-{prefix}-VIC-A",
+        disputed_amount=Decimal(seed_amount),
+        reported_time=start + timedelta(minutes=120),
+        channel="CYBER_CRIME_NCRP",
+        match_status="matched",
+        matched_transaction_id=f"TX-{prefix}-VIC-A",
+        assigned_analyst_id="USR-ANALYST-01",
+    )
+    db.add(complaint)
+    db.add(Case(
+        id=f"CASE-2026-{suffix}",
+        complaint_id=complaint.id,
+        status="open",
+        disposition="under_investigation",
+    ))
 
 
 def seed_database():
@@ -37,8 +100,10 @@ def seed_database():
 
     # Clear existing demo state cleanly
     db.query(AuditEvent).delete()
-    db.query(Complaint).delete()
+    db.query(RecommendationDraft).delete()
+    db.query(StoredTraceRun).delete()
     db.query(Case).delete()
+    db.query(Complaint).delete()
     db.query(Transaction).delete()
     db.query(Account).delete()
     db.query(Institution).delete()
@@ -95,8 +160,15 @@ def seed_database():
         name="External Partner Bank (HDFC Bank)",
         is_operating_institution=False,
     )
+    inst_international = Institution(
+        id="INST-INTL-03",
+        code="SYNTH_INTL",
+        name="Synthetic International Transfer Processor",
+        is_operating_institution=False,
+    )
     db.add(inst_operating)
     db.add(inst_external)
+    db.add(inst_international)
 
     # 3. Seed Accounts
     # Account A: complete history known, opening balance ₹0
@@ -160,9 +232,9 @@ def seed_database():
     # 4. Seed Dataset
     dataset = Dataset(
         id="DATASET-SYNTHETIC-GOLDEN-01",
-        name="VISTERA Synthetic Demo Fixtures v2",
+        name="VISTERA Synthetic Demo Fixtures v3",
         source="Synthetic Deterministic Generator",
-        checksum="sha256-synthetic-demo-fixtures-v2",
+        checksum="sha256-synthetic-demo-fixtures-v3",
         is_synthetic=True,
         row_count=Decimal("24"),
     )
@@ -372,6 +444,47 @@ def seed_database():
         disposition="under_investigation",
     ))
 
+    # Eight-hop split-and-ladder trail: a domestic account ladder and one external
+    # institution boundary. Account IDs never overlap another fixture.
+    add_extended_case(
+        db, dataset.id, suffix="0877", prefix="LADDER",
+        seed_amount="180000.00",
+        international_keys=("EXT",),
+        start=datetime(2026, 10, 6, 8, 0, tzinfo=timezone.utc),
+        transfers=[
+            ("A", "B", "100000.00", 4, "IMPS"), ("A", "C", "50000.00", 6, "NEFT"),
+            ("B", "D", "80000.00", 11, "IMPS"), ("B", "E", "20000.00", 13, "UPI"), ("C", "F", "50000.00", 15, "IMPS"),
+            ("D", "G", "60000.00", 20, "IMPS"), ("D", "H", "20000.00", 22, "UPI"), ("E", "EXT", "20000.00", 24, "SWIFT"), ("F", "I", "50000.00", 26, "NEFT"),
+            ("G", "J", "50000.00", 32, "IMPS"), ("H", "K", "20000.00", 34, "UPI"), ("I", "L", "40000.00", 36, "IMPS"),
+            ("J", "M", "40000.00", 43, "IMPS"), ("L", "N", "30000.00", 45, "NEFT"),
+            ("M", "O", "30000.00", 52, "IMPS"), ("N", "P", "20000.00", 54, "UPI"),
+            ("O", "Q", "20000.00", 62, "IMPS"), ("P", "R", "10000.00", 64, "NEFT"),
+            ("Q", "S", "10000.00", 72, "UPI"), ("R", "T", "5000.00", 74, "IMPS"),
+        ],
+    )
+
+    # Seven-hop trail with independent visibility boundaries at hops two and
+    # seven, for comparing recoverable value with money that left the ledger.
+    add_extended_case(
+        db, dataset.id, suffix="0866", prefix="BOUNDARY",
+        seed_amount="125000.00",
+        international_keys=("EXT2",),
+        start=datetime(2026, 10, 5, 7, 30, tzinfo=timezone.utc),
+        transfers=[
+            ("A", "B", "70000.00", 4, "IMPS"), ("A", "C", "40000.00", 6, "UPI"),
+            ("B", "D", "50000.00", 12, "IMPS"), ("B", "EXT1", "20000.00", 14, "RTGS"), ("C", "E", "30000.00", 16, "NEFT"),
+            ("D", "F", "40000.00", 23, "IMPS"), ("E", "G", "20000.00", 25, "UPI"),
+            ("F", "H", "30000.00", 32, "IMPS"), ("G", "I", "15000.00", 34, "NEFT"),
+            ("H", "J", "20000.00", 42, "IMPS"), ("I", "K", "10000.00", 44, "UPI"),
+            ("J", "L", "15000.00", 53, "IMPS"), ("K", "M", "8000.00", 55, "NEFT"),
+            ("L", "N", "10000.00", 64, "IMPS"), ("M", "EXT2", "8000.00", 66, "SWIFT"),
+        ],
+    )
+
+    # Keep dataset metadata aligned with every transaction inserted above.
+    db.flush()
+    dataset.row_count = Decimal(db.query(Transaction).count())
+
     # 7. Audit log initialization
     audit = AuditEvent(
         id=str(uuid.uuid4()),
@@ -382,13 +495,13 @@ def seed_database():
         target_type="system",
         target_id="all",
         reason="Initial seed and demo state reset",
-        details_json='{"status": "ready", "fixture": "golden_v1"}',
+        details_json='{"status": "ready", "fixture": "four_cases_v3"}',
     )
     db.add(audit)
 
     db.commit()
     db.close()
-    print("[SEED] Successfully seeded TRACE-X MVP database with users, institutions, accounts, and golden fixture.")
+    print("[SEED] Successfully seeded TRACE-X demo database with four isolated case fixtures.")
 
 
 if __name__ == "__main__":
