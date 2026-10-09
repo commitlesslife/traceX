@@ -81,3 +81,27 @@ html,body{background:#f4f6fa}
 .globe-focus-india{position:absolute;top:47px;right:16px;z-index:4;padding:7px 11px;border:1px solid #b8d5df;border-radius:7px;background:#f8ffffea;color:#246b77;box-shadow:0 5px 15px #38668420;font:700 9px Manrope,sans-serif;cursor:pointer;backdrop-filter:blur(8px)}
 .globe-focus-india:hover{background:#e0f5f1;border-color:#75bdb6;color:#145f67}
 @media(max-width:700px){.page-heading{padding:19px 20px;min-height:0}.original-graph-wrap{height:510px;min-height:510px}.network-zoom-controls{top:34px;right:9px;gap:3px}.network-zoom-controls button{height:25px;min-width:25px}.graph-bottom-labels small{display:none}}
+
+/* Role Switcher Pill Bar */
+.role-switcher-group{display:flex;align-items:center;gap:5px;background:#eef4f8;padding:3px 6px;border-radius:24px;border:1px solid #dbe6ef}
+.switcher-label{font:700 8px 'DM Mono',monospace;color:#6b8296;letter-spacing:.06em}
+.switcher-pill{border:0;background:transparent;color:#546e82;font-size:9.5px;font-weight:600;padding:4px 9px;border-radius:18px;cursor:pointer;transition:.15s}
+.switcher-pill:hover{color:#1f3c54}
+.switcher-pill.active-pill{background:#fff;color:#206272;box-shadow:0 2px 6px #1b4b5718;font-weight:700}
+
+/* Recommendation cards & workflow */
+.recommendation-surface{padding:18px 20px;border-left:4px solid #b37f34;margin-bottom:16px}
+.rec-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-top:10px}
+.rec-card-box{background:#fdfefe;border:1px solid #e2ece8;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 12px #20404008}
+.rec-card-box.status-approved{border-color:#bce4d6;background:linear-gradient(145deg,#fff,#f5fbf8)}
+.rec-card-box.status-rejected{border-color:#f4d0c9;background:linear-gradient(145deg,#fff,#fcf6f5)}
+.rec-card-header{display:flex;justify-content:space-between;align-items:center}
+.rec-id-tag{font:700 10px 'DM Mono',monospace;color:#355358}
+.rec-card-body{font-size:10px;color:#51656b;line-height:1.6}
+.rec-justification{font-style:italic;color:#798c91;margin-top:4px}
+.rec-doc-hash{margin-top:6px;background:#e9f4ef;padding:6px 8px;border-radius:5px;color:#2a705a;font-size:8.5px}
+.rec-doc-hash code{font-family:'DM Mono',monospace;font-weight:600;margin-left:4px}
+.approved-badge{font-size:9px;font-weight:700;color:#277e64}
+.action-highlight{background:#e7f5f0!important;color:#24725f!important;border-color:#badcd1!important;font-weight:700}
+.form-notice{background:#ebf8f2;border:1px solid #bfe7d5;color:#24745d;padding:8px 14px;border-radius:6px;font-size:10px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
