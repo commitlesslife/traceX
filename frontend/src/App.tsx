@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import './Graph.css'
 import './Polish.css'
 import MoneyMovementGlobe from './components/MoneyMovementGlobe'
+import TransactionGraph from './components/TransactionGraph'
 
 type User = { id: string; username: string; role: string; display_name: string }
 type CaseRow = { case_id: string; complaint_id: string; status: string; disposition: string; created_at: string; victim_account: string; disputed_transaction_ref: string; disputed_amount: string; reported_time: string; match_status: string; latest_trace_id?: string | null }
@@ -22,31 +23,6 @@ function Login({ onLogin }: { onLogin: (u:string,p:string)=>Promise<void> }) {
  const [username,setUsername]=useState('analyst_priya'),[password,setPassword]=useState('analyst123'),[error,setError]=useState(''),[busy,setBusy]=useState(false)
  const submit=async(e:FormEvent)=>{e.preventDefault();setBusy(true);setError('');try{await onLogin(username,password)}catch(err){setError(err instanceof Error?err.message:'Sign-in failed')}finally{setBusy(false)}}
  return <main className="login-shell"><div className="login-brand"><div className="brand-mark"><NavIcon name="investigation"/></div><span>TRACE<span className="brand-x">X</span></span></div><section className="login-card"><div className="eyebrow"><i className="live-dot"/> INVESTIGATION WORKSPACE</div><h1>Welcome back<span>.</span></h1><p className="login-intro">Sign in to review reported fraud and trace transaction evidence.</p><form onSubmit={submit}><label>Username<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label>{error&&<p className="form-error">{error}</p>}<button className="button primary full" disabled={busy}>{busy?'Signing in…':'Sign in securely'}</button></form><div className="login-foot">◈ Demo environment · synthetic records</div></section><aside className="login-aside"><div className="aside-grid">{Array.from({length:9},(_,i)=><i key={i}/>)}</div><span>FOLLOW THE EVIDENCE</span><p>Trace the movement.<br/>See where the trail ends.</p></aside></main>
-}
-
-function TransactionGraph({ trace, onInspect, playing }: {trace:Trace;onInspect:(id:string)=>void;playing:boolean}) {
- const edges: TraceEdge[] = useMemo(() => {
-  const first = trace.nodes.find(n => n.min_hop === 1) ?? trace.nodes[0]
-  const seed: TraceEdge[] = first ? [{ transaction_id: trace.seed_transaction_id, source_account: trace.victim_account, destination_account: first.account_id, timestamp_utc: '', raw_amount: trace.seed_amount, attributed_amount: trace.seed_amount, fraction: '1', confidence: '1', hop: 0, channel: 'Reported payment', is_terminal: false, evidence_id: '' }] : []
-  return [...seed, ...trace.edges]
- }, [trace])
- const layout = useMemo(()=>{
-  const nodeMap=new Map<string,TraceNode>(); trace.nodes.forEach(n=>nodeMap.set(n.account_id,n))
-  const ids=[trace.victim_account,...trace.nodes.map(n=>n.account_id)].filter((id,i,a)=>a.indexOf(id)===i)
-  const hops=new Map<string,number>([[trace.victim_account,0]])
-  edges.forEach(e=>{hops.set(e.source_account,Math.min(hops.get(e.source_account)??99,e.hop));hops.set(e.destination_account,Math.min(hops.get(e.destination_account)??99,e.hop+1))})
-  const maxHop=Math.max(1,...Array.from(hops.values()))
-  const groups=Array.from({length:maxHop+1},(_,hop)=>ids.filter(id=>(hops.get(id)??(nodeMap.get(id)?.min_hop||1))===hop))
-  const width=Math.max(920,groups.length*250),height=Math.max(380,...groups.map(g=>g.length*122+50))
-  const pos=new Map<string,{x:number;y:number}>();groups.forEach((g,hop)=>g.forEach((id,i)=>pos.set(id,{x:105+hop*(width-210)/Math.max(1,maxHop),y:(height/(g.length+1))*(i+1)})))
-  return {ids,nodeMap,pos,width,height}
- },[trace,edges])
- const edgePath=(e:TraceEdge)=>{const a=layout.pos.get(e.source_account),b=layout.pos.get(e.destination_account);if(!a||!b)return '';const dx=Math.max(40,(b.x-a.x)*.48);return `M ${a.x+82} ${a.y} C ${a.x+dx} ${a.y}, ${b.x-dx} ${b.y}, ${b.x-82} ${b.y}`}
- return <div className="original-graph-wrap"><div className="graph-watermark">{trace.is_synthetic?'SYNTHETIC FIXTURE':'LEDGER TRACE'} <span>·</span> {trace.trace_id}</div><div className="graph-scroll"><svg className={`original-trace-graph ${playing?'flow-active':''}`} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label="Transaction flow from reported source through traced accounts">
- <defs><linearGradient id="edgeGlow"><stop stopColor="#4e9b80"/><stop offset="1" stopColor="#bb7968"/></linearGradient><filter id="popShadow" x="-30%" y="-40%" width="160%" height="190%"><feDropShadow dx="0" dy="7" stdDeviation="5" floodColor="#213b35" floodOpacity=".16"/></filter><marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#87aa99" strokeWidth="1.5"/></marker></defs>
- {edges.map(e=><g key={e.transaction_id} className="trace-edge-group"><path d={edgePath(e)} className={`trace-edge-path ${e.is_terminal?'is-terminal':''}`} markerEnd="url(#arrowHead)" onClick={()=>onInspect(e.transaction_id)} style={{cursor:'pointer'}}/><text className="trace-edge-label" x={((layout.pos.get(e.source_account)?.x||0)+(layout.pos.get(e.destination_account)?.x||0))/2} y={((layout.pos.get(e.source_account)?.y||0)+(layout.pos.get(e.destination_account)?.y||0))/2-10}>{money(e.attributed_amount)}</text>{playing&&<circle className="money-particle" r="4.5"><animateMotion dur={`${3.2+e.hop*.25}s`} repeatCount="indefinite" path={edgePath(e)}/></circle>}</g>)}
- {layout.ids.map((id,index)=>{const p=layout.pos.get(id)!;const node=layout.nodeMap.get(id);const source=id===trace.victim_account;const terminal=node?.is_terminal||false;const edge=[...edges].reverse().find(e=>e.source_account===id||e.destination_account===id);return <g key={id} className={`original-account-node ${source?'source-node':''} ${terminal?'boundary-node':''}`} transform={`translate(${p.x},${p.y})`} onClick={()=>{if(edge)onInspect(edge.transaction_id)}} tabIndex={0} role="button" aria-label={`Inspect transactions for ${node?.pseudonymous_key||id}`} filter="url(#popShadow)"><rect className="node-card-back" x="-83" y="-42" width="166" height="84" rx="12"/><rect className="node-card-face" x="-88" y="-48" width="166" height="84" rx="12"/><circle cx="-65" cy="-25" r="12" className="node-icon-ring"/><text x="-65" y="-21" textAnchor="middle" className="node-icon-text">{source?'↗':terminal?'↗':initials(node?.institution_id)}</text><text x="-45" y="-23" className="node-title">{source?'Reported source':node?.pseudonymous_key||short(id)}</text><text x="-72" y="-1" className="node-subtitle">{source?'VICTIM ACCOUNT':terminal?'OUTSIDE VISIBILITY':`HOP ${node?.min_hop||index}`}</text><text x="-72" y="21" className="node-value">{money(source?trace.seed_amount:node?.unmoved_traced_value||trace.seed_amount)}</text><circle className="node-presence" cx="64" cy="-28" r="4"/></g>})}
- </svg></div><div className="graph-bottom-labels"><span><i className="legend-source"/>Reported source</span><span><i className="legend-internal"/>Ledger-visible account</span><span><i className="legend-outside"/>Visibility boundary</span><small>Illustrative graph built from traced ledger events · select a node to inspect its linked transaction</small></div></div>
 }
 
 function TraceAttribution({ trace, transactionId }: { trace: Trace | null; transactionId: string }) {

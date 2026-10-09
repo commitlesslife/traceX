@@ -32,6 +32,7 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
   const chartHost = useRef<HTMLDivElement>(null)
   const chartRef = useRef<am5map.MapChart | null>(null)
   const movementRef = useRef<am5map.MapPointSeries | null>(null)
+  const focusHaloRef = useRef<am5map.MapLineSeries | null>(null)
   const focusLineRef = useRef<am5map.MapLineSeries | null>(null)
   const focusPointsRef = useRef<am5map.MapPointSeries | null>(null)
   const nodePositionsRef = useRef<Map<string, [number, number]>>(new Map())
@@ -106,9 +107,10 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
     })
     polygons.events.on('datavalidated', () => {
       chart.goHome(0)
+      chart.set('zoomLevel', 1.35)
       setReady(true)
     })
-    polygons.data.setAll([{ id: 'IN', polygonSettings: { fill: am5.color(0x219277) } }])
+    polygons.data.setAll([{ id: 'IN', polygonSettings: { fill: am5.color(0xb5d9c8) } }])
     polygons.mapPolygons.template.states.create('hover', { fill: am5.color(0x89accb) })
     polygons.mapPolygons.template.states.create('active', { fill: am5.color(0x5f90b6) })
     polygons.mapPolygons.template.events.on('click', event => {
@@ -128,10 +130,12 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
     const graticule = chart.series.unshift(am5map.GraticuleSeries.new(root, {}))
     graticule.mapLines.template.setAll({ stroke: am5.color(0x76a4c4), strokeOpacity: 0.28, strokeWidth: 0.7 })
 
+    const routeHalo = chart.series.push(am5map.MapLineSeries.new(root, {}))
+    routeHalo.mapLines.template.setAll({ stroke: am5.color(0xf6fffc), strokeOpacity: 0.92, strokeWidth: 8, interactive: false })
     const routeSeries = chart.series.push(am5map.MapLineSeries.new(root, {}))
-    routeSeries.mapLines.template.setAll({ stroke: am5.color(0x258b99), strokeOpacity: dense ? 0.34 : 0.8, strokeWidth: dense ? 2 : 3, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
+    routeSeries.mapLines.template.setAll({ stroke: am5.color(0x0a776e), strokeOpacity: 1, strokeWidth: 4, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
     const boundaryRoutes = chart.series.push(am5map.MapLineSeries.new(root, {}))
-    boundaryRoutes.mapLines.template.setAll({ stroke: am5.color(0xd46c66), strokeOpacity: dense ? 0.62 : 0.98, strokeWidth: dense ? 2.5 : 3.5, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
+    boundaryRoutes.mapLines.template.setAll({ stroke: am5.color(0xcf5f62), strokeOpacity: 1, strokeWidth: 4, interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
     const inspectRoute = (event: { target: { dataItem?: { dataContext: unknown } } }) => {
       const transactionId = (event.target.dataItem?.dataContext as { transactionId?: string } | undefined)?.transactionId
       if (typeof transactionId === 'string') { setSelectedTransfer(transactionId); inspectRef.current(transactionId) }
@@ -139,8 +143,11 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
     routeSeries.mapLines.template.events.on('click', inspectRoute)
     boundaryRoutes.mapLines.template.events.on('click', inspectRoute)
 
+    const focusHalo = chart.series.push(am5map.MapLineSeries.new(root, {}))
+    focusHalo.mapLines.template.setAll({ stroke: am5.color(0xf2a34d), strokeOpacity: 0.32, strokeWidth: 11, interactive: false })
+    focusHaloRef.current = focusHalo
     const focusLine = chart.series.push(am5map.MapLineSeries.new(root, {}))
-    focusLine.mapLines.template.setAll({ stroke: am5.color(0xf2a34d), strokeOpacity: 1, strokeWidth: 4.5, interactive: false })
+    focusLine.mapLines.template.setAll({ stroke: am5.color(0xf2a34d), strokeOpacity: 1, strokeWidth: 5, interactive: false })
     focusLineRef.current = focusLine
 
     const focusPoints = chart.series.push(am5map.MapPointSeries.new(root, {}))
@@ -156,10 +163,10 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
       const source = Boolean(data.source)
       const container = am5.Container.new(bulletRoot, { interactive: true, cursorOverStyle: 'pointer', tooltipText: '{title}' })
       container.children.push(am5.Circle.new(bulletRoot, {
-        radius: terminal || source ? 6.5 : dense ? 3.5 : 4.5,
+        radius: terminal || source ? 6.5 : 4.5,
         fill: am5.color(terminal ? 0xd46c66 : source ? 0x5779c5 : 0x168c85),
         stroke: am5.color(0xffffff),
-        strokeWidth: 2,
+        strokeWidth: 1.3,
         shadowColor: am5.color(terminal ? 0xd46c66 : source ? 0x5779c5 : 0x168c85),
         shadowBlur: 9,
         shadowOpacity: 0.45,
@@ -229,6 +236,7 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
       const end = nodePosition.get(flow.destination_account)
       if (!start || !end) return
       const series = flow.is_terminal ? boundaryRoutes : routeSeries
+      routeHalo.pushDataItem({ geometry: { type: 'LineString', coordinates: [start, end] } } as am5map.IMapLineSeriesDataItem)
       const route = series.pushDataItem({ geometry: { type: 'LineString', coordinates: [start, end] }, transactionId: flow.transaction_id, title: `Hop ${flow.hop} · ${flow.transaction_id}`, index } as am5map.IMapLineSeriesDataItem)
       movement.pushDataItem({ lineDataItem: route, positionOnLine: 0, transactionId: flow.transaction_id, terminal: flow.is_terminal } as am5map.IMapPointSeriesDataItem)
     })
@@ -244,6 +252,7 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
       movementAnimations.current = []
       chartRef.current = null
       movementRef.current = null
+      focusHaloRef.current = null
       focusLineRef.current = null
       focusPointsRef.current = null
       nodePositionsRef.current = new Map()
@@ -252,14 +261,19 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
   }, [trace.trace_id, flows, trace.nodes, trace.victim_account, dense])
 
   useEffect(() => {
+    const focusHalo = focusHaloRef.current
     const focusLine = focusLineRef.current
     const focusPoints = focusPointsRef.current
-    if (!ready || !focusLine || !focusPoints || !selectedFlow) return
+    if (!ready || !focusHalo || !focusLine || !focusPoints || !selectedFlow) return
     const start = nodePositionsRef.current.get(selectedFlow.source_account)
     const end = nodePositionsRef.current.get(selectedFlow.destination_account)
     if (!start || !end) return
-    focusLine.mapLines.template.set('stroke', am5.color(selectedFlow.is_terminal ? 0xe17568 : 0xf0a142))
-    focusLine.data.setAll([{ geometry: { type: 'LineString' as const, coordinates: [start, end] } }])
+    const color = am5.color(selectedFlow.is_terminal ? 0xd95e64 : 0xf09a32)
+    focusHalo.mapLines.template.set('stroke', color)
+    focusLine.mapLines.template.set('stroke', color)
+    const geometry = { type: 'LineString' as const, coordinates: [start, end] }
+    focusHalo.data.setAll([{ geometry }])
+    focusLine.data.setAll([{ geometry }])
     focusPoints.data.setAll([
       { geometry: { type: 'Point' as const, coordinates: start } },
       { geometry: { type: 'Point' as const, coordinates: end } },
@@ -291,6 +305,7 @@ export default function MoneyMovementGlobe({ trace, playing, onTogglePlaying, on
   return <>
     <div className={`money-globe-shell ${playing ? 'is-playing' : ''}`}>
       <div className="money-globe-topline"><span><i className="globe-live-dot"/> {country.toUpperCase()} <em>DRAG TO ROTATE · SCROLL OR PINCH TO ZOOM</em></span><span className="globe-schematic-tag">SYNTHETIC MAP ANCHORS</span></div>
+      <button className="globe-focus-india" type="button" onClick={() => { setCountry('India region'); chartRef.current?.animate({ key: 'rotationX', to: -78, duration: 500 }); chartRef.current?.animate({ key: 'rotationY', to: -19, duration: 500 }); chartRef.current?.animate({ key: 'zoomLevel', to: 1.58, duration: 500 }) }}>Focus India</button>
       <div className="money-globe-chart" ref={chartHost} aria-label="Interactive globe centered on India showing schematic transaction movement"/>
       <div className="globe-route-reel">
         <div className="globe-route-heading"><span>TRACE MOVEMENT <b>{visibleFlows.length} / {flows.length} transfers</b></span><span>SELECT A HOP TO FOCUS</span></div>

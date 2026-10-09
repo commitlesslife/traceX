@@ -46,3 +46,38 @@ html,body{background:#f4f6fa}
 @media(max-width:700px){.money-globe-shell{height:610px}.money-globe-chart{bottom:184px}.globe-route-reel{height:124px}.globe-focus-details{padding:13px}}
 @media(max-width:850px){.sidebar .nav-item{font-size:0}.sidebar .nav-icon{display:grid}.sidebar .nav-icon svg{display:block;width:18px;height:18px}}
 @media(max-width:640px){.sidebar .nav-item{font-size:10px}.sidebar .nav-icon{display:grid}.sidebar .nav-icon svg{width:15px;height:15px}.money-globe-chart{width:min(calc(100% - 10px),410px)}.globe-focus-details{grid-template-columns:1fr 1fr}.globe-focus-details>button{grid-column:1/-1}.globe-route-heading>span:last-child{display:none}}
+
+/* A quiet operations backdrop and a single distinct title card give the work area depth. */
+.page-content{background-color:#f1f5f9;background-image:radial-gradient(circle at 88% 5%,#dbe9fa 0,transparent 30%),radial-gradient(circle at 7% 80%,#def3eb 0,transparent 29%),linear-gradient(#dae3ee5c 1px,transparent 1px),linear-gradient(90deg,#dae3ee5c 1px,transparent 1px);background-size:auto,auto,30px 30px,30px 30px}
+.page-heading{position:relative;overflow:hidden;min-height:142px;padding:24px 28px;border:1px solid #305574;border-radius:14px;background:linear-gradient(113deg,#172a48 0%,#234665 58%,#1d676a 100%);box-shadow:0 18px 36px #243e591c}
+.page-heading:before{content:'';position:absolute;width:390px;height:390px;right:12%;top:-275px;border:1px solid #d4f4ec2b;border-radius:50%;box-shadow:0 0 0 64px #d4f4ec0a,0 0 0 128px #d4f4ec08;pointer-events:none}
+.page-heading:after{content:'';position:absolute;width:6px;height:66px;left:0;top:calc(50% - 33px);border-radius:0 6px 6px 0;background:linear-gradient(#72d9bd,#91aefa);pointer-events:none}
+.page-heading>*{position:relative;z-index:1}.page-heading h1{color:#fff;font-weight:650}.page-heading p{color:#c2d6e4}.page-heading .eyebrow{color:#a9d7d4}.page-heading .eyebrow span{color:#69a9ad}
+.page-heading .button.secondary{background:#ffffff14;color:#e9f5fa;border-color:#ffffff40}.page-heading .button.secondary:hover{background:#ffffff24;color:white}
+.page-heading .button.primary{background:linear-gradient(120deg,#1ab19a,#5d8fd8);border-color:#73b8cd;box-shadow:0 7px 20px #0e243b5c}.page-heading .button.primary:hover:not(:disabled){background:linear-gradient(120deg,#159983,#4d7cc4)}
+.surface,.metric-card,.context-strip{border-radius:12px;box-shadow:0 12px 28px #3349650d,0 1px 2px #33496508}
+.metric-card:after{content:'';position:absolute;width:84px;height:84px;right:-34px;bottom:-35px;border:1px solid #6c98c421;border-radius:50%;pointer-events:none}
+.metric-card:nth-child(2):after{border-color:#dfae6d42}.metric-card:nth-child(3):after{border-color:#57bca542}.metric-card:nth-child(4):after{border-color:#ac96d742}
+.graph-surface,.queue-surface,.timeline-surface{border-top-width:1px}.graph-surface>.section-heading{border-left:4px solid #24a498;padding-left:14px}.queue-surface>.section-heading{border-left:4px solid #5b89c8;padding-left:12px}.timeline-surface>.section-heading{border-left:4px solid #8d77c1;padding-left:12px}
+
+/* SVG nodes keep their layout transform fixed; emphasis changes only paint. */
+.original-graph-wrap{height:575px;min-height:575px;background-color:#f7fbfd;background-image:radial-gradient(#8fb5c527 1px,transparent 1px),radial-gradient(circle at 52% 45%,#fff 0,#edf7f7 85%);background-size:20px 20px,auto}
+.graph-scroll{height:100%;min-height:0;overflow:auto;overscroll-behavior:contain;cursor:grab;scrollbar-color:#adc9d5 #eaf1f6}
+.graph-scroll:active{cursor:grabbing}.original-trace-graph{width:auto;min-width:0;height:auto;min-height:0;max-width:none;max-height:none}
+.graph-artboard{position:relative;flex:none}.graph-artboard .original-trace-graph{width:100%;height:100%;min-width:0;min-height:0}
+.graph-node-hit{position:absolute;z-index:1;border:1px solid transparent;border-radius:8px;background:transparent;cursor:pointer}
+.graph-node-hit:hover,.graph-node-hit:focus-visible{border-color:#3b9a9b;background:#dcf6f326;box-shadow:0 0 0 3px #42afa32e;outline:none}
+.graph-edge-hit{position:absolute;z-index:2;border:1px solid transparent;border-radius:5px;background:transparent;cursor:pointer}
+.graph-edge-hit:hover,.graph-edge-hit:focus-visible{border-color:#e6aa55;background:#fff8e2bd;box-shadow:0 0 0 3px #e6aa552e;outline:none}
+.original-account-node{transition:none;transform-box:initial;transform-origin:initial}.original-account-node:hover,.original-account-node:focus{transform:none;filter:none;outline:none}
+.node-card-face{transition:stroke .16s,fill .16s,stroke-width .16s}.original-account-node:hover .node-card-face,.original-account-node:focus .node-card-face{stroke:#258d93;stroke-width:2;fill:#f2fbfc}
+.boundary-node:hover .node-card-face,.boundary-node:focus .node-card-face{stroke:#cb7470;fill:#fff7f4}
+.trace-edge-path{stroke:#3e968e;stroke-width:2.8;opacity:.88;cursor:pointer}.trace-edge-path.is-terminal{stroke:#d27870;opacity:.95}.trace-edge-group:hover .trace-edge-path{stroke:#efaa51;stroke-width:4}
+.trace-edge-label,.money-particle{pointer-events:none}.trace-edge-label{fill:#48798a;stroke:#f8fbfd;stroke-width:4}.money-particle{fill:#32b49b}
+.graph-watermark{z-index:2;color:#668497}.graph-bottom-labels{z-index:2;border-radius:8px;border-color:#d5e4eb;box-shadow:0 5px 18px #30546a14}
+.network-zoom-controls{position:absolute;top:10px;right:13px;z-index:3;display:flex;align-items:center;gap:5px;padding:5px;border:1px solid #d7e5ee;border-radius:9px;background:#fffffff2;box-shadow:0 7px 18px #294a641c;backdrop-filter:blur(8px)}
+.network-zoom-controls span{min-width:37px;padding:0 5px;color:#53718b;font:700 9px 'DM Mono',monospace;text-align:center}.network-zoom-controls button{height:27px;min-width:27px;border:1px solid #dce8ef;border-radius:5px;background:#f8fbff;color:#40637d;font:700 10px Manrope,sans-serif;cursor:pointer}.network-zoom-controls button:hover{background:#e7f3f5;border-color:#98c9d0;color:#176f77}.network-zoom-controls button:nth-last-child(-n+2){padding:0 8px;font-size:9px}
+.money-globe-shell{background:radial-gradient(ellipse at 50% 38%,#fff 0,#eaf5fb 63%,#dcecf5 100%)}
+.globe-focus-india{position:absolute;top:47px;right:16px;z-index:4;padding:7px 11px;border:1px solid #b8d5df;border-radius:7px;background:#f8ffffea;color:#246b77;box-shadow:0 5px 15px #38668420;font:700 9px Manrope,sans-serif;cursor:pointer;backdrop-filter:blur(8px)}
+.globe-focus-india:hover{background:#e0f5f1;border-color:#75bdb6;color:#145f67}
+@media(max-width:700px){.page-heading{padding:19px 20px;min-height:0}.original-graph-wrap{height:510px;min-height:510px}.network-zoom-controls{top:34px;right:9px;gap:3px}.network-zoom-controls button{height:25px;min-width:25px}.graph-bottom-labels small{display:none}}
